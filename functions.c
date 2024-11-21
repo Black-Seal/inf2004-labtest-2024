@@ -1,69 +1,176 @@
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "hardware/pwm.h"
 #include "functions.h"
 
-#define BUTTON_PIN 20
-#define LED_PIN 16
-#define LED_PIN2 17
+#define DOT_BUTTON_PIN 22
+#define DASH_BUTTON_PIN 21
+#define PLAYBACK_BUTTON_PIN 20
+
+#define MAX_CODES 12
+#define LED_START_PIN 2
+#define LED_END_PIN 13      // Last LED light is 13
 
 static struct repeating_timer timer;
+static uint8_t morse_code[MAX_CODES];
+static uint8_t code_index = 0;
+static bool playback_in_progress = false;
 
-void main_fn() {
-    // Example of using a function with two inputs
-    int result = example_function(5, 10);
-    printf("Example function result: %d\n", result);
+void init_gpio()
+{
+    /* Dot Button with interrupt */
+    gpio_init(DOT_BUTTON_PIN);
+    gpio_set_dir(DOT_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(DOT_BUTTON_PIN);
+
+    /* Dash Button with interrupt */
+    gpio_init(DASH_BUTTON_PIN);
+    gpio_set_dir(DASH_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(DASH_BUTTON_PIN);
+
+    /* Playback Button with interrupt */
+    gpio_init(PLAYBACK_BUTTON_PIN);
+    gpio_set_dir(PLAYBACK_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(PLAYBACK_BUTTON_PIN);
+
+    // Single callback function for all button interrupts
+    gpio_set_irq_enabled_with_callback(DOT_BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true, button_callback);
+    gpio_set_irq_enabled(DASH_BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true);
+    gpio_set_irq_enabled(PLAYBACK_BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true);
+
+    // Initialize LEDs on Pico W (GP2 to GP13)
+    for (uint gpio = LED_START_PIN; gpio <= LED_END_PIN; gpio++)
+    {
+        gpio_init(gpio);
+        gpio_set_dir(gpio, GPIO_OUT);
+        gpio_put(gpio, 0);  // Turn off LED
+    }
 }
 
-// Timer callback function
-bool repeating_timer_callback(struct repeating_timer *t) {
-    static bool led_state = false;
-    gpio_put(LED_PIN2, led_state);  // Toggle LED
-    led_state = !led_state;  // Flip state for next toggle
-
-    printf("Timer triggered! LED is now %s\n", led_state ? "ON" : "OFF");
-    return true;  // Return true to keep the timer repeating
+void init_pwm()
+{
+    for (uint gpio = LED_START_PIN; gpio <= LED_END_PIN; gpio++)
+    {
+        gpio_set_function(gpio, GPIO_FUNC_PWM);
+        uint slice_num = pwm_gpio_to_slice_num(gpio);
+        pwm_set_wrap(slice_num, 255);  // 8-bit resolution (0-255)
+        pwm_set_enabled(slice_num, true);
+    }
+    printf("PWM initialized on LEDs\n");
 }
 
-// Initialize GPIO (LED and button with interrupt)
-void init_gpio() {
-    // Initialize LED
-    gpio_init(LED_PIN2);
-    gpio_set_dir(LED_PIN2, GPIO_OUT);
 
-    // Initialize Button with interrupt
-    gpio_init(BUTTON_PIN);
-    gpio_set_dir(BUTTON_PIN, GPIO_IN);
-    gpio_pull_up(BUTTON_PIN);
-    gpio_set_irq_enabled_with_callback(BUTTON_PIN, GPIO_IRQ_EDGE_FALL, true, button_callback);
+void button_callback(uint gpio, uint32_t events)
+{
+    if (playback_in_progress)
+    {
+        return;  // Ignore button presses during playback
+    }
+
+    if (gpio == DOT_BUTTON_PIN)
+    {
+        if (code_index < MAX_CODES)
+        {
+            add_dotdash(0);
+            printf("Dot added: [%d]\n", code_index - 1);
+        }
+        else
+        {
+            printf("Max Capacity Reached\n");
+        }
+    }
+    else if (gpio == DASH_BUTTON_PIN)
+    {
+        if (code_index < MAX_CODES)
+        {
+            add_dotdash(1);
+            printf("Dash added: [%d]\n", code_index - 1);
+        }
+        else
+        {
+            printf("Max Capacity Reached\n");
+        }
+    }
+    else if (gpio == PLAYBACK_BUTTON_PIN)
+    {
+        playback_in_progress = true;
+        printf(">>>Code Playback Start\n");
+
+        // Turn off all LEDs before playback
+        for (uint led_gpio = LED_START_PIN; led_gpio <= LED_END_PIN; led_gpio++)
+        {
+            setup_pwm(led_gpio, 0);
+        }
+
+        // Start playback timer
+        add_repeating_timer_ms(1000, timer_callback, NULL, &timer);
+    }
 }
 
-// Button interrupt callback
-void button_callback(uint gpio, uint32_t events) {
-    printf("Button on GP%d pressed!\n", gpio);
+/*
+    In the add_dotdash function,
+    0 represents a dot.
+    1 represents a dash.
+*/
+uint add_dotdash(uint dotdash)
+{
+    morse_code[code_index++] = dotdash;
+    return code_index;
 }
 
-// Function to set up PWM on LED with a specific duty cycle
-void init_pwm() {
-    gpio_set_function(LED_PIN, GPIO_FUNC_PWM);
-    uint slice_num = pwm_gpio_to_slice_num(LED_PIN);
+bool timer_callback(struct repeating_timer *rt)
+{
+    static uint playback_index = 0;
 
-    pwm_set_wrap(slice_num, 255);  // 8-bit resolution (0-255)
-    pwm_set_chan_level(slice_num, pwm_gpio_to_channel(LED_PIN), (50 * 255) / 100); // 50% duty cycle
-    pwm_set_enabled(slice_num, true);
+    if (playback_index < code_index)
+    {
+        playback_update_led(playback_index, morse_code[playback_index]);
+        playback_index++;
+        return true;  // Continue the timer
+    }
+    else
+    {
+        printf(">>>Code Playback End\n");
+        playback_in_progress = false;
+        playback_index = 0;
 
-    printf("PWM initialized on GPIO %d with 50%% duty cycle\n", LED_PIN);
+        // Turn off all LEDs after playback
+        for (uint led_gpio = LED_START_PIN; led_gpio <= LED_END_PIN; led_gpio++)
+        {
+            setup_pwm(led_gpio, 0);
+        }
+
+        cancel_repeating_timer(rt);
+        return false;
+    }
 }
 
-// Set up and start a repeating timer that triggers every second (1000 ms)
-void start_timer() {
-    add_repeating_timer_ms(5000, repeating_timer_callback, NULL, &timer);
+void playback_update_led(uint led_id, uint led_state)
+{
+    uint gpio = LED_END_PIN - led_id;  // Start from GP13 downwards
+
+    if (gpio < LED_START_PIN || gpio > LED_END_PIN)
+    {
+        return;  // Invalid GPIO pin
+    }
+
+    if (led_state == 0)
+    {
+        setup_pwm(gpio, 255);  // Normal brightness for dot
+        printf("Dot at [%d]\n", led_id);
+    }
+    else
+    {
+        setup_pwm(gpio, 25);  // Dimmer brightness for dash (10% duty cycle)
+        printf("Dash at [%d]\n", led_id);
+    }
 }
 
-// Example function with two integer inputs and an integer return value
-int example_function(int a, int b) {
-    int result = a + b;
-    printf("example_function: %d + %d = %d\n", a, b, result);
-    return result;
+void setup_pwm(uint gpio, uint dutycycle)
+{
+    uint slice_num = pwm_gpio_to_slice_num(gpio);
+    uint channel = pwm_gpio_to_channel(gpio);
+
+    pwm_set_chan_level(slice_num, channel, dutycycle);
+}
+
+void main_fn()
+{
 }

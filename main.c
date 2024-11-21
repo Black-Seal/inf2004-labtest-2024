@@ -1,21 +1,19 @@
-#include <stdio.h>
-#include "pico/stdlib.h"
 #include "functions.h"
 
-int main() {
-    stdio_init_all();       // Initialize USB serial output
-    printf("Testing Pico Example\n");
+int main(void)
+{
+    stdio_init_all();
+    printf("Morse Code Capture and Playback\n");
 
     // Initialize system components
-    init_gpio();            // Initialize LED and button
-    init_pwm();             // Set up PWM on LED
-    start_timer();          // Set up and start repeating timer
+    init_gpio();
+    init_pwm();
 
-    while (1) {
-        //Calls the starting function
-        main_fn();
-
-        // Delay to simulate workload in the main loop
-        sleep_ms(2000);
+    // Main loop can be left empty as we're using interrupts
+    while (1)
+    {
+        tight_loop_contents();  // Placeholder for main loop
     }
+
+    return 0;
 }
