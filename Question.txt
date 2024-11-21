@@ -1,0 +1,78 @@
+1. Use two buttons to capture the inputs of dots (GP22) and dashes (GP21)
+    Output to serial monitor on status
+        Example: "Dot added: [0]"
+        Example: "Dash added: [1]"
+
+2. Records up to a max of 12 dots or dashes.
+    Output to serial monitor on status.
+        Example: "Max Capacity Reached"
+
+3. Button (gp20) to initiate the playback of the recorded morse code with LED (GP2 to GP13)
+    Max of 12 codes can be represented with LED (GP2 to GP13)
+
+    Dot & dash can still be added till max capacity, even during or after playback.
+
+    Each code will light up in sequence, with intervals of 1 second.
+        Example: first code represented by LED GP13, second code by LED GP12, and so on.
+    
+    A dot is represented by normal brightness, a dash is represented by a dimmer brightness. (hint: Dash - PWM at 10% duty cycle)
+
+    Output to serial monitor on status.
+        Example: ">>>Code Playback Start"
+        Example: "Dot at [0]"
+        Example: "Dash at [1]"
+        Example: ">>>Code Playback End"
+
+4. After LED playback,
+    All LED should turn off.
+
+    Pressing button GP20 will again playback the recorded morse code with LED.
+        All LED turn off.
+        Replay the recorded codes.
+    
+    Output to serial monitor on status.
+        Example: ">>>Code Playback Start"
+        Example: ">>>Code Playback Start"
+
+5. Maintains operation using an interrupt-driven approach.
+
+Task Instructions: 
+
+1. Hardware Configuration:
+    Use GP22 as an input with an interrupt to capture dots.
+    Use GP21 as an input with an interrupt to capture dashes.
+    Use GP20 as an input with an interrupt to capture playback captured codes.
+
+2. Functional requirements:
+
+    Dot Input: Button presses using GP22.
+    Dash Input: Button presses using GP21.
+    Code Playback: Button presses using GP20.
+    PWM Control: Dynamically adjust LED (GP2 TO GP13) brightness using PWM.
+    Button Interrupts: Use a single callback function to handle all button inputs.
+
+    Timer Management: Use a timer to manage the time frame when button presses are valid.
+
+    You must use the following function prototypes (in functions.c).
+
+    #include <stdio.h>
+#include "pico/stdlib.h"
+#include "hardware/pwm.h"
+#include "hardware/timer.h"
+#include "hardware/irq.h"
+
+// Interrupt callback for tracking number of taps
+void button_callback(uint gpio, uint32_t events);
+
+// Timer callback for 1-second updates
+bool timer_callback(repeating_timer_t *rt);
+
+// Setup PWM on a specific GPIO pin
+void setup_pwm(uint gpio, uint dutycycle);
+
+// Add a dot or dash
+uint add_dotdash(uint dotdash);
+
+// Playback update LED
+bool playback_update_led(uint led_id, uint led_state);
+
