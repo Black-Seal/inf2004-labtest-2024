@@ -56,23 +56,23 @@ Task Instructions:
     You must use the following function prototypes (in functions.c).
 
     #include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/pwm.h"
-#include "hardware/timer.h"
-#include "hardware/irq.h"
+    #include "pico/stdlib.h"
+    #include "hardware/pwm.h"
+    #include "hardware/timer.h"
+    #include "hardware/irq.h"
 
-// Interrupt callback for tracking number of taps
-void button_callback(uint gpio, uint32_t events);
+    // Interrupt callback for tracking number of taps
+    void button_callback(uint gpio, uint32_t events);
 
-// Timer callback for 1-second updates
-bool timer_callback(repeating_timer_t *rt);
+    // Timer callback for 1-second updates
+    bool timer_callback(repeating_timer_t *rt);
 
-// Setup PWM on a specific GPIO pin
-void setup_pwm(uint gpio, uint dutycycle);
+    // Setup PWM on a specific GPIO pin
+    void setup_pwm(uint gpio, uint dutycycle);
 
-// Add a dot or dash
-uint add_dotdash(uint dotdash);
+    // Add a dot or dash
+    uint add_dotdash(uint dotdash);
 
-// Playback update LED
-bool playback_update_led(uint led_id, uint led_state);
+    // Playback update LED
+    bool playback_update_led(uint led_id, uint led_state);
 
