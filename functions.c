@@ -5,14 +5,18 @@
 #define PLAYBACK_BUTTON_PIN 20
 
 #define MAX_CODES 12
-#define LED_START_PIN 2
-#define LED_END_PIN 13      // Last LED light is 13
+#define LED_START_PIN 2     // Last LED
+#define LED_END_PIN 13      // First LED
 
+// Global Variables
 static struct repeating_timer timer;
 static uint8_t morse_code[MAX_CODES];
 static uint8_t code_index = 0;
 static bool playback_in_progress = false;
 
+/*
+    Initialize all buttons for the dot, dash and playback.
+*/
 void init_gpio()
 {
     /* Dot Button with interrupt */
@@ -60,9 +64,7 @@ void init_pwm()
 void button_callback(uint gpio, uint32_t events)
 {
     if (playback_in_progress)
-    {
-        return;  // Ignore button presses during playback
-    }
+        return;
 
     if (gpio == DOT_BUTTON_PIN)
     {
@@ -123,7 +125,7 @@ bool timer_callback(struct repeating_timer *rt)
     {
         playback_update_led(playback_index, morse_code[playback_index]);
         playback_index++;
-        return true;  // Continue the timer
+        return true;
     }
     else
     {
@@ -144,21 +146,20 @@ bool timer_callback(struct repeating_timer *rt)
 
 void playback_update_led(uint led_id, uint led_state)
 {
-    uint gpio = LED_END_PIN - led_id;  // Start from GP13 downwards
+    uint gpio = LED_END_PIN - led_id;  // Start from GP13 onwards
 
+    // Check for invalid GPIO pin
     if (gpio < LED_START_PIN || gpio > LED_END_PIN)
-    {
-        return;  // Invalid GPIO pin
-    }
+        return;
 
     if (led_state == 0)
     {
-        setup_pwm(gpio, 255);  // Normal brightness for dot
+        setup_pwm(gpio, 255);
         printf("Dot at [%d]\n", led_id);
     }
     else
     {
-        setup_pwm(gpio, 25);  // Dimmer brightness for dash (10% duty cycle)
+        setup_pwm(gpio, 25);
         printf("Dash at [%d]\n", led_id);
     }
 }

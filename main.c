@@ -9,10 +9,9 @@ int main(void)
     init_gpio();
     init_pwm();
 
-    // Main loop can be left empty as we're using interrupts
-    while (1)
+    
+    for (;;)
     {
-        tight_loop_contents();  // Placeholder for main loop
     }
 
     return 0;
